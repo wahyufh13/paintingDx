@@ -1,0 +1,170 @@
+DECLARE
+    l_body          CLOB;
+    l_dolly_number  VARCHAR2(50);
+    l_img_base64    CLOB;
+    l_mime_type     VARCHAR2(100);
+    l_img_blob      BLOB;
+
+    -- master check
+    l_dolly_id      VARCHAR2(50);
+    l_dolly_status  VARCHAR2(20);
+
+    -- fundoshi queue
+    l_fundoshi_id   NUMBER;
+    l_vin_number    VARCHAR2(50);
+    l_topcoat_cc    VARCHAR2(50);
+    l_model_spec    VARCHAR2(200);
+
+    -- log dolly id
+    l_log_id        VARCHAR2(50);
+BEGIN
+    -- --------------------------------------------------
+    -- 1. Parse request body
+    -- --------------------------------------------------
+    l_body := :body_text;
+
+    IF l_body IS NULL THEN
+        owa_util.mime_header('application/json', FALSE);
+        owa_util.http_header_close;
+        htp.p('{"success": false, "message": "Request body kosong"}');
+        RETURN;
+    END IF;
+
+    apex_json.parse(l_body);
+
+    l_dolly_number := apex_json.get_varchar2('dolly_number');
+    l_img_base64   := apex_json.get_clob('image_base64');
+    l_mime_type    := NVL(apex_json.get_varchar2('mime_type'), 'image/jpeg');
+
+    IF l_dolly_number IS NULL THEN
+        owa_util.mime_header('application/json', FALSE);
+        owa_util.http_header_close;
+        htp.p('{"success": false, "message": "dolly_number wajib diisi"}');
+        RETURN;
+    END IF;
+
+    -- --------------------------------------------------
+    -- 2. Decode image base64 → BLOB
+    -- --------------------------------------------------
+    IF l_img_base64 IS NOT NULL THEN
+        IF INSTR(l_img_base64, 'base64,') > 0 THEN
+            l_img_base64 := SUBSTR(l_img_base64, INSTR(l_img_base64, 'base64,') + 7);
+        END IF;
+        l_img_blob := apex_web_service.clobbase642blob(l_img_base64);
+    END IF;
+
+    -- --------------------------------------------------
+    -- 3. Generate LOG_DOLLY_ID
+    -- --------------------------------------------------
+    l_log_id := l_dolly_number || '_' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS');
+
+    -- --------------------------------------------------
+    -- 4. Validasi: cek dolly di master
+    -- --------------------------------------------------
+    BEGIN
+        SELECT dolly_id, status
+        INTO   l_dolly_id, l_dolly_status
+        FROM   intranet.ins_painting_dolly_mst
+        WHERE  dolly_number = l_dolly_number
+        AND    ROWNUM = 1;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            -- Log sebagai INVALID
+            INSERT INTO intranet.ins_painting_dolly_log
+                (log_dolly_id, log_dolly_name, log_dolly_image,
+                 log_dolly_datetime, mime_type, status)
+            VALUES
+                (l_log_id, l_dolly_number, l_img_blob,
+                 SYSTIMESTAMP, l_mime_type, 'INVALID');
+            COMMIT;
+
+            owa_uhttp://172.16.173.211/ords/f?p=4550:1:7794181883402:::::til.mime_header('application/json', FALSE);
+            owa_util.http_header_close;
+            htp.p('{"success": false, "code": "DOLLY_NOT_FOUND", "message": "Dolly tidak ditemukan di master"}');
+            RETURN;
+    END;
+
+    -- --------------------------------------------------
+    -- 5. Validasi: cek status dolly tidak MARRIED
+    -- --------------------------------------------------
+    IF UPPER(l_dolly_status) = 'MARRIED' THEN
+        -- Log sebagai INVALID
+        INSERT INTO intranet.ins_painting_dolly_log
+            (log_dolly_id, log_dolly_name, log_dolly_image,
+             log_dolly_datetime, mime_type, status)
+        VALUES
+            (l_log_id, l_dolly_number, l_img_blob,
+             SYSTIMESTAMP, l_mime_type, 'INVALID');
+        COMMIT;
+
+        owa_util.mime_header('application/json', FALSE);
+        owa_util.http_header_close;
+        htp.p('{"success": false, "code": "DOLLY_MARRIED", "message": "Dolly sudah married dengan VIN lain"}');
+        RETURN;
+    END IF;
+
+    -- --------------------------------------------------
+    -- 6. Cek antrian fundoshi (status PENDING)
+    -- --------------------------------------------------
+    BEGIN
+        SELECT fundoshi_id, vin_number, topcoat_color_code, model_spec_dest
+        INTO   l_fundoshi_id, l_vin_number, l_topcoat_cc, l_model_spec
+        FROM  http://172.16.173.211/ords/f?p=4550:1:7794181883402::::: dolly_number = l_dolly_number
+        AND    UPPER(status) = 'PENDING'
+        AND    ROWNUM = 1
+        ORDER BY fundoshi_datetime ASC;  -- FIFO
+
+        -- --------------------------------------------------
+        -- 7A. MATCHED: fundoshi ditemukan
+        -- --------------------------------------------------
+
+        -- Update fundoshi status → QUEUED
+        UPDATE intranet.ins_painting_fundoshi_log
+        SET    status = 'QUEUED'
+        WHERE  fundoshi_id = l_fundoshi_id;
+
+        -- Insert log dolly sebagai MATCHED
+        INSERT INTO intranet.ins_painting_dolly_log
+            (log_dolly_id, log_dolly_name, log_dolly_image,
+             log_dolly_datetime, mime_type,
+             status, matched_vin, fundoshi_id)
+        VALUES
+            (l_log_id, l_dolly_number, l_img_blob,
+             SYSTIMESTAMP, l_mime_type,
+             'MATCHED', l_vin_number, l_fundoshi_id);
+
+        COMMIT;
+
+        -- Response sukses + data untuk WPF
+        owa_util.mime_header('application/json', FALSE);
+        owa_util.http_header_close;
+        htp.p('{' ||
+              '"success": true,' ||
+              '"matched": true,' ||
+              '"fundoshi_id": '    || l_fundoshi_id    || ',' ||
+              '"vin_number": "'    || l_vin_number     || '",' ||
+              '"dolly_number": "'  || l_dolly_number   || '",' ||
+              '"topcoat_color_code": "' || NVL(l_topcoat_cc, '') || '",' ||
+              '"model_spec_dest": "' || NVL(l_model_spec, '') || '"' ||
+              '}');
+http://172.16.173.211/ords/f?p=4550:1:7794181883402:::::            -- --------------------------------------------------
+            INSERT INTO intranet.ins_painting_dolly_log
+                (log_dolly_id, log_dolly_name, log_dolly_image,
+                 log_dolly_datetime, mime_type, status)
+            VALUES
+                (l_log_id, l_dolly_number, l_img_blob,
+                 SYSTIMESTAMP, l_mime_type, 'NO_QUEUE');
+            COMMIT;
+
+            owa_util.mime_header('application/json', FALSE);
+            owa_util.http_header_close;
+            htp.p('{"success": true, "matched": false, "code": "NO_QUEUE", "message": "Dolly valid tapi belum ada antrian VIN"}');
+    END;
+
+EXCEPTION
+http://172.16.173.211/ords/f?p=4550:1:7794181883402:::::    WHEN OTHERS THEN
+        ROLLBACK;
+        owa_util.mime_header('application/json', FALSE);
+        owa_util.http_header_close;
+        htp.p('{"success": false, "message": "' || REPLACE(SQLERRM, '"', '\"') || '"}');
+END;
