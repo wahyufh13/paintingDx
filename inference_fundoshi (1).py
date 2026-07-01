@@ -33,15 +33,15 @@ SEND_COOLDOWN_SEC = 2.0
 # SESSION / STABLE SETTINGS
 # =========================================================
 WAIT_SECONDS    = 2.0   # tunggu N detik setelah semua field ready
-STABLE_REQUIRED = 10    # harus stabil N frame setelah wait time
+STABLE_REQUIRED = 60    # harus stabil N frame setelah wait time
 
 # =========================================================
 # STATE MACHINE SETTINGS
 # =========================================================
 # Berapa frame YOLO harus "kosong" untuk konfirmasi kertas diangkat
-NO_DETECT_REQUIRED  = 5
+NO_DETECT_REQUIRED  = 20
 # Berapa frame YOLO harus "ada" untuk konfirmasi kertas baru masuk
-NEW_DETECT_REQUIRED = 3
+NEW_DETECT_REQUIRED = 10
 
 # =========================================================
 # ROI (RELATIVE TERHADAP BBOX KERTAS)

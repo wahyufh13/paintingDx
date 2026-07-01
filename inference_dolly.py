@@ -19,11 +19,11 @@ HIST_MAX     = 10
 
 OCR_LANG        = "en"
 USE_GPU         = False
-MIN_CONF        = 0.5
-FLIP_HORIZONTAL = False
+MIN_CONF        = 0.8
+FLIP_HORIZONTAL = True
 
-ENABLE_API   = False
-ORDS_URL     = "http://idtbintranetdev/ords/intranet/painting/ocr_dolly"
+ENABLE_API   = True
+ORDS_URL     = "http://172.16.173.211/ords/intranet/painting/ocr_dolly"
 TIMEOUT      = 5
 SEND_COOLDOWN = 5
 
@@ -31,12 +31,12 @@ SEND_COOLDOWN = 5
 # STATE MACHINE SETTINGS
 # =========================================================
 # Berapa frame OCR harus "kosong" untuk konfirmasi dolly sudah keluar
-NO_DETECT_REQUIRED = 5
+NO_DETECT_REQUIRED = 15
 # Berapa frame OCR harus baca 3 digit valid berturut-turut
 # sebelum trigger session baru (READY → SCANNING)
-NEW_DETECT_REQUIRED = 3
+NEW_DETECT_REQUIRED = 15
 # Berapa frame raw OCR harus konsisten sebelum trigger SEND
-# (menghindari false trigger dari 1 frame noise)
+# (menghindari false trigger dari 1 frame noise)Tenda_FA8160
 CONSECUTIVE_REQUIRED = 2
 
 # =========================================================
